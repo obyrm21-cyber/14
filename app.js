@@ -242,4 +242,186 @@ async function renderWebM(){
   });
 }
 $('#format').onchange=()=>{$('#renderBtn').textContent=$('#format').value==='mp4'?'▶ MP4 olarak dışa aktar':'▶ WebM olarak dışa aktar'};$('#renderBtn').onclick=async()=>{if(!media.length){alert('Önce görsel veya video yükleyin.');return}$('#renderBtn').disabled=true;$('#download').hidden=true;$('#renderProgress').hidden=false;$('#progressBar').style.width='0%';try{const webm=await renderWebM();let ext=$('#format').value;if(ext==='mp4'){try{const blob=await convertWebMtoMP4(webm);offerDownload(blob,'mp4','MP4 hazır')}catch(err){console.warn('MP4 motoru kullanılamadı, WebM fallback:',err);offerDownload(webm,'webm','MP4 motoru bu tarayıcıda kullanılamadı; WebM hazır')}}else offerDownload(webm,'webm','WEBM hazır')}catch(err){console.error(err);alert('Dışa aktarma hatası: '+(err?.message||err));$('#status').textContent='Dışa aktarma başarısız'}finally{$('#renderBtn').disabled=false;setTimeout(()=>$('#renderProgress').hidden=true,1200)}};
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('#installBtn').hidden=false});$('#installBtn').onclick=async()=>{if(installPrompt){installPrompt.prompt();installPrompt=null}};if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js');setCanvasSize();draw();      const shouldPlay=playing && current>=s.start && current<s.end;
+      if(shouldPlay){
+        if(obj._sceneIndex!==si){
+          media.forEach(x=>{if(x.el.tagName==='VIDEO'&&x.el!==obj){try{x.el.pause()}catch{}}});
+          obj._sceneIndex=si;
+          obj.currentTime=seekTarget;
+          obj.play().catch(()=>{});
+        }
+      }else{
+        if(obj._sceneIndex!==si){obj._sceneIndex=si;obj.currentTime=seekTarget}
+        else if(Math.abs(obj.currentTime-seekTarget)>.35){
+          obj.currentTime=seekTarget;
+        }
+        try{obj.pause()}catch{}
+      }
+    }
+  }
+  drawImageFit(obj,p,m,alpha)
+}
+function draw(t=0){
+  setCanvasSize();
+  ctx.clearRect(0,0,stage.width,stage.height);
+  ctx.fillStyle='#050811';
+  ctx.fillRect(0,0,stage.width,stage.height);
+  if(!media.length){$('#emptyState').style.display='flex';updateLabels(t);return}
+  $('#emptyState').style.display='none';
+  const i=sceneAt(t), s=scenes[i];
+  if(i<0||!s){updateLabels(t);return}
+  // STRICT TIMELINE: exactly one scene is rendered for each timestamp.
+  // The previous scene is never called when the next scene starts.
+  const fadeDuration=Math.max(.05,Number($('#fadeDuration')?.value||0));
+  const local=Math.max(0,t-s.start);
+  const alpha=$('#transition')?.value==='fade'&&fadeDuration>0
+    ?Math.min(1,local/fadeDuration):1;
+  drawScene(i,t,alpha);
+  applyEffect();
+  if(s.text&&($('#embedSubtitles')?.checked??true))drawSubtitle(s.text);
+  updateLabels(t);
+  document.querySelectorAll('.scene').forEach((e,n)=>e.classList.toggle('active',n===i));
+}
+function applyEffect(){let e=$('#effect').value;if(e==='warm'){ctx.fillStyle='rgba(255,150,40,.12)';ctx.fillRect(0,0,stage.width,stage.height)}else if(e==='cinema'){ctx.fillStyle='rgba(10,14,26,.18)';ctx.fillRect(0,0,stage.width,stage.height)}else if(e==='mono'){let g=ctx.getImageData(0,0,stage.width,stage.height),d=g.data;for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];d[i]=d[i+1]=d[i+2]=y}ctx.putImageData(g,0,0)}else if(e==='vignette'){let g=ctx.createRadialGradient(stage.width/2,stage.height/2,Math.min(stage.width,stage.height)*.15,stage.width/2,stage.height/2,Math.max(stage.width,stage.height)*.65);g.addColorStop(0,'transparent');g.addColorStop(1,'rgba(0,0,0,.72)');ctx.fillStyle=g;ctx.fillRect(0,0,stage.width,stage.height)}}
+function drawSubtitle(text){let pos=$('#subPosition').value,size=$('#subSize').value,sf=stage.width/960,fs=(size==='large'?34:size==='small'?21:27)*sf,y=stage.height-70*sf;if(pos==='center')y=stage.height/2;if(pos==='top')y=75*sf;ctx.font=`800 ${fs}px Arial`;ctx.textAlign='center';let max=stage.width-110*sf,lines=[],line='';for(const w of text.split(/\s+/)){let test=line?line+' '+w:w;if(ctx.measureText(test).width>max&&line){lines.push(line);line=w}else line=test}if(line)lines.push(line);let lh=fs*1.25;if(['box','neon','lower'].includes(selectedStyle)){ctx.fillStyle=selectedStyle==='neon'?'rgba(100,20,190,.78)':'rgba(0,0,0,.78)';ctx.fillRect(55*sf,y-fs,stage.width-110*sf,lines.length*lh+fs*.55)}ctx.fillStyle=selectedStyle==='yellow'||selectedStyle==='karaoke'?'#ffe35e':'#fff';ctx.strokeStyle='rgba(0,0,0,.82)';ctx.lineWidth=5*sf;lines.forEach((l,n)=>{let yy=y+n*lh;ctx.strokeText(l,stage.width/2,yy);ctx.fillText(l,stage.width/2,yy)})}
+function updateLabels(t){let d=totalDuration();$('#timeline').value=Math.min(t,d);$('#timeLabel').textContent=`${fmt(t)} / ${fmt(d)}`}
+function renderScenes(){let box=$('#scenes');box.innerHTML='';scenes.forEach((s,i)=>{let d=document.createElement('div');d.className='scene';d.innerHTML=`<strong>SAHNE ${String(i+1).padStart(2,'0')}</strong><time>${fmt(s.start)} — ${fmt(s.end)}</time><p>${s.text||'Otomatik sahne'}</p><small class="motion-tag">${motionFor(s,i)}</small>`;d.onclick=()=>{current=s.start;audio.currentTime=current;draw(current)};box.append(d)})}
+async function loadMedia(files){media.forEach(m=>URL.revokeObjectURL(m.url));media=[];for(const file of [...files].sort(sortFiles)){let el=file.type.startsWith('video/')?document.createElement('video'):new Image(),url=URL.createObjectURL(file);el.src=url;el.muted=true;el.playsInline=true;el.crossOrigin='anonymous';if(el.tagName==='VIDEO'){el.preload='auto';await new Promise(r=>{el.onloadedmetadata=()=>r();el.onerror=()=>r();el.load()})}else await new Promise(r=>{el.onload=()=>r();el.onerror=()=>r()});media.push({name:file.name,el,url})}$('#status').textContent=`${media.length} medya hazır`;buildScenes()}
+$('#mediaInput').onchange=e=>loadMedia(e.target.files);$('#audioInput').onchange=e=>{let f=e.target.files[0];if(!f)return;audio.src=URL.createObjectURL(f);$('#audioLabel').textContent=f.name;initAudio();audio.onloadedmetadata=()=>buildScenes()};$('#srtInput').onchange=async e=>{let f=e.target.files[0];if(!f)return;cues=parseSrt(await f.text());$('#srtLabel').textContent=f.name;$('#status').textContent=`${cues.length} altyazı bloğu hazır`;buildScenes()};
+let playbackClock=0,playbackStartedAt=0;
+$('#playBtn').onclick=async()=>{
+  if(audio.src){initAudio();if(audioCtx.state==='suspended')await audioCtx.resume()}
+  playing=!playing;$('#playBtn').textContent=playing?'Ⅱ':'▶';
+  if(playing){
+    if(current>=totalDuration())current=0;
+    playbackClock=current;playbackStartedAt=performance.now()-current*1000;
+    if(audio.src){audio.currentTime=current;await audio.play().catch(()=>{})}
+    tick();
+  }else{
+    if(audio.src)audio.pause();
+    media.forEach(x=>{if(x.el.tagName==='VIDEO')try{x.el.pause()}catch{}});
+    cancelAnimationFrame(raf);
+  }
+};
+$('#timeline').oninput=e=>{
+  current=+e.target.value;playbackClock=current;playbackStartedAt=performance.now()-current*1000;
+  if(audio.src)audio.currentTime=current;
+  media.forEach(x=>{if(x.el.tagName==='VIDEO'){x.el._sceneIndex=-1;try{x.el.pause()}catch{}}});
+  draw(current);
+};
+function tick(){
+  if(!playing)return;
+  const d=totalDuration();
+  current=audio.src&&Number.isFinite(audio.duration)?audio.currentTime:Math.min(d,(performance.now()-playbackStartedAt)/1000);
+  draw(current);
+  if(current>=d){playing=false;$('#playBtn').textContent='▶';if(audio.src)audio.pause();media.forEach(x=>{if(x.el.tagName==='VIDEO')try{x.el.pause()}catch{}});return}
+  raf=requestAnimationFrame(tick);
+}
+document.querySelectorAll('.style').forEach(b=>b.onclick=()=>{document.querySelectorAll('.style').forEach(x=>x.classList.remove('active'));b.classList.add('active');selectedStyle=b.dataset.style;draw(current)});document.querySelectorAll('select').forEach(s=>s.onchange=()=>{if(['orientation','resolution'].includes(s.id))setCanvasSize();if(s.id==='motion')renderScenes();draw(current)});
+const CORE_BASE='https://unpkg.com/@ffmpeg/core-st@0.11.1/dist';
+async function ensureFFmpeg(){
+  if(ffmpegLoaded)return;
+  if(!window.FFmpeg || !window.FFmpeg.createFFmpeg)throw Error('MP4 motoru bu tarayıcıda kullanılamadı.');
+  const {createFFmpeg}=window.FFmpeg;
+  $('#status').textContent='MP4 motoru hazırlanıyor…';
+  ffmpeg=createFFmpeg({
+    log:false,
+    corePath:`${CORE_BASE}/ffmpeg-core.js`,
+    progress:({ratio})=>{$('#progressBar').style.width=Math.round(Math.max(0,Math.min(1,ratio||0))*100)+'%'}
+  });
+  await ffmpeg.load();
+  ffmpegLoaded=true;
+}
+async function convertWebMtoMP4(blob){
+  await ensureFFmpeg();
+  const {fetchFile}=window.FFmpeg;
+  ffmpeg.FS('writeFile','input.webm',await fetchFile(blob));
+  await ffmpeg.run('-i','input.webm','-c:v','libx264','-preset','veryfast','-pix_fmt','yuv420p','-movflags','+faststart','-c:a','aac','-b:a','192k','output.mp4');
+  const out=ffmpeg.FS('readFile','output.mp4');
+  try{ffmpeg.FS('unlink','input.webm');ffmpeg.FS('unlink','output.mp4')}catch{}
+  return new Blob([out.buffer],{type:'video/mp4'});
+}
+function offerDownload(blob,ext,label){
+  const url=URL.createObjectURL(blob),a=$('#download');
+  const preview=$('#outputPreview');
+  if(preview){preview.src=url;preview.hidden=false;preview.load()}
+
+  a.href=url;a.download=`kurgu-canavari-${Date.now()}.${ext}`;
+  a.textContent=`İndir: kurgu-canavari.${ext}`;a.hidden=false;
+  $('#progressBar').style.width='100%';$('#status').textContent=label;
+}
+function nextAnimationFrame(){
+  return new Promise(resolve=>requestAnimationFrame(resolve));
+}
+
+async function renderWebM(){
+  setCanvasSize();
+  const duration=Math.max(.05,totalDuration());
+  const fps=Number($('#quality').value)||30;
+  const frameCount=Math.max(1,Math.ceil(duration*fps));
+  const videoStream=stage.captureStream(fps);
+  let combinedStream=videoStream,hasAudio=false;
+  try{
+    initAudio();
+    if(audio.src){
+      const tracks=audioDestination.stream.getAudioTracks();
+      if(tracks.length){combinedStream=new MediaStream([...videoStream.getVideoTracks(),...tracks]);hasAudio=true}
+    }
+  }catch(e){console.warn('Ses kaydı devre dışı:',e)}
+  const types=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  const mime=types.find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+  if(!mime)throw Error('Bu tarayıcı WebM video kaydını desteklemiyor.');
+  const recorder=new MediaRecorder(combinedStream,{mimeType:mime,videoBitsPerSecond:6000000});
+  const chunks=[];
+  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  const finished=new Promise((resolve,reject)=>{
+    recorder.onerror=e=>reject(e.error||new Error('MediaRecorder hatası'));
+    recorder.onstop=()=>resolve(new Blob(chunks,{type:'video/webm'}));
+  });
+  let stopped=false;
+  const stop=()=>{
+    if(stopped)return;
+    stopped=true;
+    if(recorder.state!=='inactive')recorder.stop();
+    try{audio.pause()}catch{}
+    videoStream.getTracks().forEach(t=>t.stop());
+    if(combinedStream!==videoStream)combinedStream.getAudioTracks().forEach(t=>t.stop());
+  };
+  current=0;playing=false;
+  media.forEach(x=>{if(x.el.tagName==='VIDEO'){x.el._sceneIndex=-1;try{x.el.pause()}catch{}}});
+  // Sesli renderda audio.currentTime master clock'tur. Kaydı, ses gerçekten
+  // başladıktan sonra açıyoruz; böylece ilk video karesi sesin 0. saniyesine
+  // bağlanır. Ses yoksa performance.now() fallback'i kullanılır.
+  if(hasAudio){
+    audio.currentTime=0;
+    try{await audio.play()}catch(e){throw Error('Ses oynatılamadı; senkron render başlatılamadı.')}
+  }
+  ctx.clearRect(0,0,stage.width,stage.height);ctx.fillStyle='#050811';ctx.fillRect(0,0,stage.width,stage.height);
+  recorder.start(250);
+  const started=performance.now();
+  return new Promise((resolve,reject)=>{
+    let frameNo=0;
+    const next=()=>{
+      if(stopped)return;
+      const wallClock=(performance.now()-started)/1000;
+      const masterClock=hasAudio&&Number.isFinite(audio.currentTime)?audio.currentTime:wallClock;
+      const t=Math.min(Math.max(0,masterClock),Math.max(0,duration-.001));
+      current=t;
+      draw(t); // audio.currentTime -> SRT + görsel aynı master clock
+      const pct=Math.round(Math.min(1,Math.max(0,t/duration))*100);
+      $('#progressBar').style.width=pct+'%';
+      $('#status').textContent=`WebM oluşturuluyor… ${pct}%`;
+      frameNo++;
+      const done=hasAudio?audio.currentTime>=duration-.001:frameNo>=frameCount;
+      if(done){
+        current=Math.max(0,duration-.001);
+        draw(current);
+        stop();
+        finished.then(resolve).catch(reject);
+      }else requestAnimationFrame(next);
+    };
+    requestAnimationFrame(next);
+  });
+}
+$('#format').onchange=()=>{$('#renderBtn').textContent=$('#format').value==='mp4'?'▶ MP4 olarak dışa aktar':'▶ WebM olarak dışa aktar'};$('#renderBtn').onclick=async()=>{if(!media.length){alert('Önce görsel veya video yükleyin.');return}$('#renderBtn').disabled=true;$('#download').hidden=true;$('#renderProgress').hidden=false;$('#progressBar').style.width='0%';try{const webm=await renderWebM();let ext=$('#format').value;if(ext==='mp4'){try{const blob=await convertWebMtoMP4(webm);offerDownload(blob,'mp4','MP4 hazır')}catch(err){console.warn('MP4 motoru kullanılamadı, WebM fallback:',err);offerDownload(webm,'webm','MP4 motoru bu tarayıcıda kullanılamadı; WebM hazır')}}else offerDownload(webm,'webm','WEBM hazır')}catch(err){console.error(err);alert('Dışa aktarma hatası: '+(err?.message||err));$('#status').textContent='Dışa aktarma başarısız'}finally{$('#renderBtn').disabled=false;setTimeout(()=>$('#renderProgress').hidden=true,1200)}};
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('#installBtn').hidden=false});$('#installBtn').onclick=async()=>{if(installPrompt){installPrompt.prompt();installPrompt=null}};if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js');setCanvasSize();draw();
