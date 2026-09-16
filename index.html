@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090d1a"><meta name="description" content="Kurgu Canavarı — görsel, video, ses ve SRT ile yerel video editörü.">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="styles.css">
+<title>Kurgu Canavarı — V4 Düzeltilmiş</title>
+</head>
+<body>
+<header class="topbar"><div class="brand"><span class="brand-mark">✦</span><div><strong>Kurgu Canavarı</strong><small>yerel video çalışma alanı</small></div></div><button id="installBtn" class="ghost" hidden>Uygulamayı yükle</button></header>
+<main class="shell">
+<section class="hero"><div><p class="eyebrow">YAPAY ZİHİN / MASTER CLOCK</p><h1>Ses, görsel ve altyazıyı tek akışta eşleştir.</h1><p class="lede">SRT ile veya SRT olmadan sahnelerini oluştur; hareket, format, geçiş ve altyazıyı seç; WebM veya MP4 dışa aktar.</p></div><div class="privacy"><span>●</span> Dosyalar cihazından çıkmaz</div></section>
+<section class="workspace">
+<aside class="panel inputs"><div class="panel-title"><span>01</span><h2>Medya yükle</h2></div>
+<label class="dropzone"><input id="mediaInput" type="file" accept="image/*,video/*" multiple><span class="drop-icon">＋</span><b>Görsel / video ekle</b><small>01, 02, 03… şeklinde sıralanır</small></label>
+<label class="dropzone compact"><input id="audioInput" type="file" accept="audio/*"><span class="file-icon">♫</span><b id="audioLabel">Seslendirme dosyası</b><small>MP3, WAV veya M4A</small></label>
+<label class="dropzone compact"><input id="srtInput" type="file" accept=".srt,text/plain"><span class="file-icon">Aa</span><b id="srtLabel">SRT altyazı dosyası</b><small>Zaman kodları otomatik sahneye dönüşür</small></label>
+<div class="hint">SRT yoksa da sahneler otomatik oluşturulur. Dosyaları 01-sahne.jpg, 02-sahne.mp4 gibi adlandırabilirsin.</div></aside>
+<section class="panel preview-panel"><div class="panel-title"><span>02</span><h2>Canlı ön izleme</h2><div class="status" id="status">Hazır</div></div>
+<div class="stage-wrap"><canvas id="stage" width="1920" height="1080"></canvas><div id="emptyState" class="empty"><span>◈</span><b>Ön izleme alanı</b><small>Medya yükleyerek başla</small></div></div>
+<div class="transport"><button id="playBtn" class="play">▶</button><input id="timeline" type="range" min="0" max="1" step="0.01" value="0"><span id="timeLabel">00:00 / 00:00</span></div><audio id="audio" controls></audio></section>
+<aside class="panel settings"><div class="panel-title"><span>03</span><h2>Sahne planı</h2></div>
+<div class="field-grid">
+<label>Video formatı<select id="orientation"><option value="portrait">Dikey · 9:16</option><option value="landscape" selected>Yatay · 16:9</option><option value="square">Kare · 1:1</option><option value="portrait4x5">Dikey · 4:5</option></select></label>
+<label>Çözünürlük<select id="resolution"><option value="720">720p</option><option value="1080" selected>1080p</option></select></label>
+<label>Görsel davranışı<select id="fit"><option value="cover">Ekranı doldur</option><option value="contain">Görseli koru</option></select></label>
+<label>Görsel hareketi<select id="motion"><option value="mixed" selected>Karışık Zoom In / Out</option><option value="zoomIn">Gerçek Zoom In</option><option value="zoomOut">Gerçek Zoom Out</option><option value="none">Zoom kapalı</option></select></label>
+<label>Sahne geçişi<select id="transition"><option value="cut">Keskin geçiş</option><option value="fade" selected>Fade-in (tek sahne)</option><option value="slide">Kaydırmalı</option><option value="zoom">Zoom geçiş</option></select></label><label>Fade süresi<select id="fadeDuration"><option value="0.25">0,25 sn</option><option value="0.5" selected>0,5 sn</option><option value="0.75">0,75 sn</option><option value="1">1 sn</option></select></label>
+<label>Görsel efekt<select id="effect"><option value="none">Efektsiz</option><option value="cinema">Sinematik</option><option value="warm">Sıcak ton</option><option value="vignette">Vignette</option><option value="mono">Siyah-beyaz</option></select></label>
+<label>Altyazı konumu<select id="subPosition"><option value="bottom">Alt</option><option value="center">Merkez</option><option value="top">Üst</option></select></label>
+<label>Altyazı boyutu<select id="subSize"><option value="small">Küçük</option><option value="medium" selected>Orta</option><option value="large">Büyük</option></select></label><label class="check-field"><input id="embedSubtitles" type="checkbox" checked> SRT altyazıyı videoya göm</label>
+<label>FPS<select id="quality"><option value="24">24 FPS</option><option value="30" selected>30 FPS</option><option value="60">60 FPS</option></select></label>
+<label>Çıktı biçimi<select id="format"><option value="mp4" selected>MP4 · H.264 + AAC</option><option value="webm">WebM</option></select></label>
+</div>
+<h3>Altyazı stili</h3><div class="styles" id="styles"><button class="style active" data-style="off">Aa<small>Kapalı</small></button><button class="style" data-style="classic">Hikâye burada<small>Klasik beyaz</small></button><button class="style dark" data-style="box">Hikâye burada<small>Koyu kutu</small></button><button class="style yellow" data-style="yellow">Hikâye burada<small>Sarı vurgulu</small></button><button class="style neon" data-style="neon">Hikâye burada<small>Neon mor</small></button><button class="style cinema" data-style="cinema">Hikâye burada<small>Sinema</small></button><button class="style dark" data-style="minimal">Hikâye burada<small>Minimal</small></button><button class="style yellow" data-style="karaoke">Hikâye burada<small>Karaoke</small></button><button class="style" data-style="typewriter">Hikâye burada<small>Typewriter</small></button><button class="style dark" data-style="lower">Hikâye burada<small>Lower Third</small></button></div>
+<button id="renderBtn" class="primary">▶ MP4 olarak dışa aktar</button><div class="output-preview"><video id="outputPreview" controls playsinline hidden></video></div><div id="renderProgress" class="progress" hidden><div id="progressBar"></div></div><a id="download" class="download" hidden>Çıktıyı indir</a></aside>
+</section>
+<section class="scene-list panel"><div class="panel-title"><span>04</span><h2>Sahne zaman çizelgesi</h2><span id="sceneCount" class="muted">0 sahne</span></div><div id="scenes" class="scenes"><p class="muted">Medya yüklediğinde sahneler burada oluşur.</p></div></section>
+<footer><span>Kurgu Canavarı PWA</span><span>GitHub Pages · Yerel işleme · MP4/WebM</span></footer>
+</main>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script><script src="app.js?v=12"></script>
+</body></html>
